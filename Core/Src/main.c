@@ -384,12 +384,63 @@ void * microros_zero_allocate(size_t number_of_elements, size_t size_of_element,
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+
+  // micro-ROS configuration
+
+  rmw_uros_set_custom_transport(
+    true,
+    (void *) &huart3,
+    cubemx_transport_open,
+    cubemx_transport_close,
+    cubemx_transport_write,
+    cubemx_transport_read);
+
+  rcl_allocator_t freeRTOS_allocator = rcutils_get_zero_initialized_allocator();
+  freeRTOS_allocator.allocate = microros_allocate;
+  freeRTOS_allocator.deallocate = microros_deallocate;
+  freeRTOS_allocator.reallocate = microros_reallocate;
+  freeRTOS_allocator.zero_allocate =  microros_zero_allocate;
+
+  if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
+      printf("Error on default allocators (line %d)\n", __LINE__); 
   }
+
+  // micro-ROS app
+
+  rcl_publisher_t publisher;
+  std_msgs__msg__Int32 msg;
+  rclc_support_t support;
+  rcl_allocator_t allocator;
+  rcl_node_t node;
+
+  allocator = rcl_get_default_allocator();
+
+  //create init_options
+  // rclc_support_init(&support, 0, NULL, &allocator);
+
   /* USER CODE END 5 */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM1 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM1)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
 }
 
 /**
