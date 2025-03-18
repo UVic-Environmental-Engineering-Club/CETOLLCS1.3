@@ -416,8 +416,31 @@ void StartDefaultTask(void *argument)
   allocator = rcl_get_default_allocator();
 
   //create init_options
-  // rclc_support_init(&support, 0, NULL, &allocator);
+  rclc_support_init(&support, 0, NULL, &allocator);
 
+  // create node
+  rclc_node_init_default(&node, "cubemx_node", "", &support);
+
+  // create publisher
+  rclc_publisher_init_default(
+    &publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+    "cubemx_publisher");
+
+  msg.data = 0;
+
+  for(;;)
+  {
+    rcl_ret_t ret = rcl_publish(&publisher, &msg, NULL);
+    if (ret != RCL_RET_OK)
+    {
+      printf("Error publishing (line %d)\n", __LINE__); 
+    }
+    
+    msg.data++;
+    osDelay(10);
+  }
   /* USER CODE END 5 */
 }
 
