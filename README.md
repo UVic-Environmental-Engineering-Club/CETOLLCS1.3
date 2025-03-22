@@ -1,4 +1,4 @@
-#Sea Puppy Low Level Control System V1.3
+# Sea Puppy Low Level Control System V1.3
 ### Made by UVic Environmental Engineering Club ([UVEEC](https://uveec.ca/)) at [University of Victoria](https://www.uvic.ca/)
 [![stmicroelectronics](https://img.shields.io/badge/stmicroelectronics-03234B.svg?&logo=stmicroelectronics)](https://www.st.com/content/st_com/en.html)
 [![c](https://img.shields.io/badge/c-A8B9CC.svg?&logo=c)](https://en.cppreference.com/w/c/language)
