@@ -1,12 +1,16 @@
 #Sea Puppy Low Level Control System V1.3
-### Made by UVic Environmental Engineering Club (UVEEC)
+### Made by UVic Environmental Engineering Club ([UVEEC](https://uveec.ca/)) at [University of Victoria](https://www.uvic.ca/)
 [![stmicroelectronics](https://img.shields.io/badge/stmicroelectronics-03234B.svg?&logo=stmicroelectronics)](https://www.st.com/content/st_com/en.html)
 [![c](https://img.shields.io/badge/c-A8B9CC.svg?&logo=c)](https://en.cppreference.com/w/c/language)
 [![cplusplus](https://img.shields.io/badge/c++-00599C.svg?&logo=cplusplus)](https://www.st.com/content/st_com/en.html)
 [![ros](https://img.shields.io/badge/ros-22314E.svg?&logo=ros)](https://docs.ros.org/en/humble/index.html)
 
 ## Description
-This is a low level control system written in C/C++. CUBE IDE development environment was used on Windows 10. MicroROS for ROS2 Humble has been deployed. MicroROS is to be used to communication with ROS2 Humble on Raspberry Pi with Blue OS from Blue Robotics. Full documentation about Low Level Control System can be found [here](https://docs.google.com/document/d/1BvOxKdqG76WM1FazrVoIZYhodaNmmSBSupSmKFFQtNc/edit?tab=t.0) (only available for UVEEC member). If you need access to this documentation, please create [issue]((https://github.com/UVic-Environmental-Engineering-Club/SeaPuppy1.3/issues)) on this project.
+This repo is part of Sea Glider project (SeaPuppy) by UVEEC. Sea glider is an unmanned underwater vehicle (UUV) for ocean research. Compare to conventional submarine, glider is more efficient because it utilizes buoyance and gavity as driving power. 
+
+This is a low level control system for the sea glider written in C/C++. This repo is responsible for STM32 on UVEEC's PCB "Megamind". "Megamind" is responsible for reading sensors and actuating engines on the sea glider. Full documentation about Low Level Control System can be found [here](https://docs.google.com/document/d/1BvOxKdqG76WM1FazrVoIZYhodaNmmSBSupSmKFFQtNc/edit?tab=t.0) (only available for UVEEC member).
+
+CUBE IDE development environment was used on Windows 10. MicroROS for ROS2 Humble has been deployed. MicroROS is to be used to communication with ROS2 Humble on Raspberry Pi with Blue OS from Blue Robotics. If you need access to this documentation, please create [issue]((https://github.com/UVic-Environmental-Engineering-Club/SeaPuppy1.3/issues)) on this project.
 
 ## Getting Started (If you are UVEEC member)
 1. Go to uveec club room and log into the desktop.
