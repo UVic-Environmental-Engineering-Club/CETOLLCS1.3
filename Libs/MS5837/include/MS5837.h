@@ -37,11 +37,12 @@ THE SOFTWARE.
 #ifndef MS5837_H_BLUEROBOTICS
 #define MS5837_H_BLUEROBOTICS
 
-#include "Arduino.h"
-#include <Wire.h>
+#include "stdint.h"
+// #include "Arduino.h"
+// #include <Wire.h>
 
-class MS5837 {
-public:
+// class MS5837 {
+// public:
 	static const float Pa;
 	static const float bar;
 	static const float mbar;
@@ -52,8 +53,8 @@ public:
 
 	MS5837();
 
-	bool init(TwoWire &wirePort = Wire);
-	bool begin(TwoWire &wirePort = Wire); // Calls init()
+	// bool init(TwoWire &wirePort = Wire);
+	// bool begin(TwoWire &wirePort = Wire); // Calls init()
 
 	/** Set model of MS5837 sensor. Valid options are MS5837::MS5837_30BA (default)
 	 * and MS5837::MS5837_02BA.
@@ -68,11 +69,12 @@ public:
 
 	/** The read from I2C takes up to 40 ms, so use sparingly is possible.
 	 */
-	void read();
+	// void read();
 
 	/** Pressure returned in mbar or mbar*conversion rate.
 	 */
-	float pressure(float conversion = 1.0f);
+	// float pressure(float conversion = 1.0f);
+	float pressure(float conversion);
 
 	/** Temperature returned in deg C.
 	 */
@@ -87,10 +89,10 @@ public:
 	 */
 	float altitude();
 
-private:
+// private:
 
 	//This stores the requested i2c port
-	TwoWire * _i2cPort;
+	// TwoWire * _i2cPort;
 
 	uint16_t C[8];
 	uint32_t D1_pres, D2_temp;
@@ -106,6 +108,6 @@ private:
 	void calculate();
 
 	uint8_t crc4(uint16_t n_prom[]);
-};
+// };
 
 #endif
