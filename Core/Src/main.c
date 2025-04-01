@@ -71,7 +71,7 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-
+uint8_t RX_Buffer [1];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -124,7 +124,8 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_I2C_Slave_Receive(&hi2c1 ,(uint8_t *)RX_Buffer, 1,1000); //Receiving in Blocking mode
+  HAL_Delay(100);
   /* USER CODE END 2 */
 
   /* Init scheduler */
