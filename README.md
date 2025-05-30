@@ -25,14 +25,20 @@ CUBE IDE development environment was used on Windows 10. MicroROS for ROS2 Humbl
 3. Open CubeIDE. File -> Import -> General -> Existing Projects into Workspace -> Select the clone of this project. You do not have to change anything on ioc.
 4. Connect your STM32 with ST-Link.
 5. Connect your ST-Link to your Windows machine.
-6. Build. (CubeIDE might prompt to install ST-Link-Server. Follow the pop-up's instruction)
-7. Run.
-8. You can not unplug your STM32. (If there was any issue before this process, please use [git issues](https://github.com/UVic-Environmental-Engineering-Club/SeaPuppy1.3/issues) to report)
-9. Plug in your STM32 to Raspberry Pi with NAvigator Flight Controller.
-10. You are done with this part. Follow instruction on Raspberry Pi documentation. (To be developed and documented)
+6. For **Windows Users** Open a terminal in the project folder and run (make sure to sign in to docker desktop first):
+   ```
+   docker pull microros/micro_ros_static_library_builder:humble
+   docker run --rm -v <ABSOLUTE_PATH_TO_PROJECT>:/project --env MICROROS_LIBRARY_FOLDER=micro_ros_stm32cubemx_utils/microros_static_library_ide microros/micro_ros_static_library_builder:humble
+   ```
+   This will include **libmicroros** which is crucial to setup MicroROS in your system.
+   Follow this guide under **Windows 11 (Community Contributed)**:  [micro_ros_stm32cubemx_utils](https://github.com/micro-ROS/micro_ros_stm32cubemx_utils)
+8. Build. (CubeIDE might prompt to install ST-Link-Server. Follow the pop-up's instruction)
+9. Run.
+10. You can not unplug your STM32. (If there was any issue before this process, please use [git issues](https://github.com/UVic-Environmental-Engineering-Club/SeaPuppy1.3/issues) to report)
+11. Plug in your STM32 to Raspberry Pi with NAvigator Flight Controller.
+12. You are done with this part. Follow instruction on Raspberry Pi documentation. (To be developed and documented)
 
 ## Relevent documentations
 * [micro_ros_stm32cubemx_utils](https://github.com/micro-ROS/micro_ros_stm32cubemx_utils)
 * [First micro-ROS Application on Linux](https://micro.ros.org/docs/tutorials/core/first_application_linux/)
 * [ROS2 humble](https://docs.ros.org/en/humble/index.html)
-
