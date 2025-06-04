@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <include/MS5837.h>
 #include "main.h"
 #include "cmsis_os.h"
 
@@ -32,7 +31,10 @@
 #include <rmw_microros/rmw_microros.h>
 
 #include <std_msgs/msg/int32.h>
-// #include <MS5837.h>
+#include <std_msgs/msg/string.h>
+
+#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,6 +54,10 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+DMA_HandleTypeDef hdma_i2c1_tx;
+DMA_HandleTypeDef hdma_i2c1_rx;
+
 UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_usart3_rx;
 DMA_HandleTypeDef hdma_usart3_tx;
@@ -71,7 +77,24 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+rcl_node_t node;
+rclc_support_t support;
+rcl_allocator_t allocator;
+rclc_executor_t executor;
 
+// publisher
+rcl_publisher_t publisher;
+std_msgs__msg__Int32 pub_msg;
+rcl_timer_t timer;
+
+// subscriber
+rcl_subscription_t subscriber;
+std_msgs__msg__Int32 sub_msg;
+
+const unsigned int timer_period = RCL_MS_TO_NS(10);
+const int timeout_ms = 1000;
+
+int32_t blinkCounter = 5;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -80,15 +103,47 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
+static void MX_I2C1_Init(void);
 void StartDefaultTask(void *argument);
 
 /* USER CODE BEGIN PFP */
+void subscription_callback(const void *msgin);
 
+void error_loop(){}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void subscription_callback(const void * msgin)
+{
+  // Cast received message to used type
+  const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
 
+  // Process message
+  blinkCounter = msg->data;
+}
+
+void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
+	static uint8_t cnt = 0;
+
+	if (timer != NULL) {
+		// Sync micro-ROS session
+		rmw_uros_sync_session(timeout_ms);
+
+		// Toggle LED every 50 cycles (approximately every 0.5 seconds)
+		if (cnt == 0)
+			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		cnt = (cnt + 1) % 50;
+
+		pub_msg.data++;
+
+		// Publish the message
+		rcl_publish(&publisher, &pub_msg, NULL);
+
+		// Reinitialize watchdog timer
+		// HAL_IWDG_Init(&hiwdg);
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -99,6 +154,9 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+	blinkCounter = 5;
+
+
 
   /* USER CODE END 1 */
 
@@ -123,7 +181,17 @@ int main(void)
   MX_DMA_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+
+  while (blinkCounter > 0)
+  {
+	HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
+	HAL_Delay(100);
+	HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
+	HAL_Delay(100);
+	blinkCounter -= 1;
+  }
 
   /* USER CODE END 2 */
 
@@ -221,6 +289,40 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -298,12 +400,18 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
   /* DMA1_Stream1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
   /* DMA1_Stream3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 
 }
 
@@ -374,6 +482,7 @@ void * microros_allocate(size_t size, void * state);
 void microros_deallocate(void * pointer, void * state);
 void * microros_reallocate(void * pointer, size_t size, void * state);
 void * microros_zero_allocate(size_t number_of_elements, size_t size_of_element, void * state);
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -388,7 +497,6 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN 5 */
 
   // micro-ROS configuration
-
   rmw_uros_set_custom_transport(
     true,
     (void *) &huart3,
@@ -397,52 +505,56 @@ void StartDefaultTask(void *argument)
     cubemx_transport_write,
     cubemx_transport_read);
 
-  rcl_allocator_t freeRTOS_allocator = rcutils_get_zero_initialized_allocator();
-  freeRTOS_allocator.allocate = microros_allocate;
-  freeRTOS_allocator.deallocate = microros_deallocate;
-  freeRTOS_allocator.reallocate = microros_reallocate;
-  freeRTOS_allocator.zero_allocate =  microros_zero_allocate;
-
-  if (!rcutils_set_default_allocator(&freeRTOS_allocator)) {
-      printf("Error on default allocators (line %d)\n", __LINE__); 
-  }
-
-  // micro-ROS app
-
-  rcl_publisher_t publisher;
-  std_msgs__msg__Int32 msg;
-  rclc_support_t support;
-  rcl_allocator_t allocator;
-  rcl_node_t node;
-
   allocator = rcl_get_default_allocator();
 
+  pub_msg.data = 0;
+
   //create init_options
-  rclc_support_init(&support, 0, NULL, &allocator);
+  RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
 
   // create node
-  rclc_node_init_default(&node, "cubemx_node", "", &support);
+  RCCHECK(rclc_node_init_default(&node, "cubemx_node", "", &support));
 
   // create publisher
-  rclc_publisher_init_default(
+  RCCHECK(rclc_publisher_init_default(
     &publisher,
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-    "cubemx_publisher");
+    "cubemx_publisher"));
 
-  msg.data = 0;
+  // create subscriber
+  RCCHECK(rclc_subscription_init_default(
+    &subscriber,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+    "raspberry_publisher"));
+
+  // create executor
+  RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+  RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &sub_msg, &subscription_callback, ON_NEW_DATA));
 
   for(;;)
   {
-    rcl_ret_t ret = rcl_publish(&publisher, &msg, NULL);
+    rcl_ret_t ret = rcl_publish(&publisher, &pub_msg, NULL);
     if (ret != RCL_RET_OK)
     {
-      printf("Error publishing (line %d)\n", __LINE__); 
+      printf("Error publishing (line %d)\n", __LINE__);
     }
-    
-    msg.data++;
-    osDelay(10);
+
+    pub_msg.data++;
+    osDelay(100);
+    RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
+
+    while (blinkCounter > 0)
+      {
+        HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
+        HAL_Delay(100);
+        HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
+        HAL_Delay(100);
+        blinkCounter -= 1;
+      }
   }
+
   /* USER CODE END 5 */
 }
 
