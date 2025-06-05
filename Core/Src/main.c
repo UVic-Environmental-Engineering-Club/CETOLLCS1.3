@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+// Micro-ROS definitions
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
@@ -30,9 +31,11 @@
 #include <rmw_microxrcedds_c/config.h>
 #include <rmw_microros/rmw_microros.h>
 
+// std_msgs for Micro-ROS
 #include <std_msgs/msg/int32.h>
 #include <std_msgs/msg/string.h>
 
+// RCL return Check
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 /* USER CODE END Includes */
@@ -114,6 +117,7 @@ void error_loop(){}
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// subscription_callback. Triggered by subscriber executor
 void subscription_callback(const void * msgin)
 {
   // Cast received message to used type
@@ -473,6 +477,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// Micro-ROS Cube MX definitions
 bool cubemx_transport_open(struct uxrCustomTransport * transport);
 bool cubemx_transport_close(struct uxrCustomTransport * transport);
 size_t cubemx_transport_write(struct uxrCustomTransport* transport, const uint8_t * buf, size_t len, uint8_t * err);
@@ -529,22 +534,28 @@ void StartDefaultTask(void *argument)
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
     "raspberry_publisher"));
 
-  // create executor
+  // create executor (subscribing)
   RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &sub_msg, &subscription_callback, ON_NEW_DATA));
 
+  // infintie loop. Might need to change this to use executors
   for(;;)
   {
+	// publish to the topic
     rcl_ret_t ret = rcl_publish(&publisher, &pub_msg, NULL);
     if (ret != RCL_RET_OK)
     {
       printf("Error publishing (line %d)\n", __LINE__);
     }
 
+    // counter
     pub_msg.data++;
     osDelay(100);
+
+    // spin executor to subscribe to topic
     RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
 
+    // blink the counter by the data received from the topic
     while (blinkCounter > 0)
       {
         HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
