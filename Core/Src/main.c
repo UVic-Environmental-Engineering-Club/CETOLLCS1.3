@@ -33,11 +33,22 @@
 
 // std_msgs for Micro-ROS
 #include <std_msgs/msg/int32.h>
+#include <std_msgs/msg/u_int16.h>
 #include <std_msgs/msg/string.h>
+
+// UVEEC Custom Interface
+// #include <uveec_custom_interfaces/msg/raspberry_sensors_interface.h>
+// #include <uveec_custom_interfaces/msg/stm_sensors_interface.h>
+// #include <uveec_custom_interface/msg/detail/raspberry_sensors_interface.h>
+// #include <uveec_custom_interface/msg/detail/StmSensorsInterface.h>
 
 // RCL return Check
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+
+// TOF sensor
+#include "VL53L0X.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,10 +68,16 @@ typedef StaticTask_t osStaticThreadDef_t;
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
-DMA_HandleTypeDef hdma_i2c1_tx;
-DMA_HandleTypeDef hdma_i2c1_rx;
+ADC_HandleTypeDef hadc1;
 
+CAN_HandleTypeDef hcan1;
+
+I2C_HandleTypeDef hi2c1;
+
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim4;
+
+UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_usart3_rx;
 DMA_HandleTypeDef hdma_usart3_tx;
@@ -79,6 +96,27 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = sizeof(defaultTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for Actuate */
+osThreadId_t ActuateHandle;
+const osThreadAttr_t Actuate_attributes = {
+  .name = "Actuate",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
+/* Definitions for tosDistTask */
+osThreadId_t tosDistTaskHandle;
+const osThreadAttr_t tosDistTask_attributes = {
+  .name = "tosDistTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
+/* Definitions for rollEncoderTask */
+osThreadId_t rollEncoderTaskHandle;
+const osThreadAttr_t rollEncoderTask_attributes = {
+  .name = "rollEncoderTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
 rcl_node_t node;
 rclc_support_t support;
@@ -88,6 +126,11 @@ rclc_executor_t executor;
 // publisher
 rcl_publisher_t publisher;
 std_msgs__msg__Int32 pub_msg;
+rcl_publisher_t dist_publisher;
+std_msgs__msg__UInt16 dist_msg;
+rcl_publisher_t roll_publisher;
+std_msgs__msg__Int32 roll_msg;
+// TODO uveec_custom_interface__msg__StmSensorsInterface pub_msg;
 rcl_timer_t timer;
 
 // subscriber
@@ -98,6 +141,13 @@ const unsigned int timer_period = RCL_MS_TO_NS(10);
 const int timeout_ms = 1000;
 
 int32_t blinkCounter = 5;
+float depthsensor = 0;
+float rollHull = 0;
+
+volatile uint32_t last_ts = 0;
+volatile uint32_t last_period = 0;
+volatile uint32_t pulse_count = 0;
+volatile float rpm = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,8 +156,16 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_CAN1_Init(void);
+static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM2_Init(void);
 void StartDefaultTask(void *argument);
+void StartActuate(void *argument);
+void StartDistTask(void *argument);
+void StartRollTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 void subscription_callback(const void *msgin);
@@ -121,33 +179,70 @@ void error_loop(){}
 void subscription_callback(const void * msgin)
 {
   // Cast received message to used type
-  const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
+  // const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
+  // TODO const uveec_custom_interface__msg__RaspberrySensorsInterface * raspmsg = (const uveec_custom_interface__msg__RaspberrySensorsInterface *) msgin;
 
   // Process message
-  blinkCounter = msg->data;
+  // blinkCounter = msg->data;
+  blinkCounter = 3;
+  // TODO blinkConuter = raspmsg->depthsensor;
 }
 
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
-	static uint8_t cnt = 0;
+	// static uint8_t cnt = 0;
 
-	if (timer != NULL) {
+	// if (timer != NULL) {
 		// Sync micro-ROS session
-		rmw_uros_sync_session(timeout_ms);
+		// rmw_uros_sync_session(timeout_ms);
 
 		// Toggle LED every 50 cycles (approximately every 0.5 seconds)
-		if (cnt == 0)
-			HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-		cnt = (cnt + 1) % 50;
+		// if (cnt == 0)
+			// HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		// cnt = (cnt + 1) % 50;
 
-		pub_msg.data++;
+		// pub_msg.data++;
+		// TODO pub_msg.gpslatitude = 0;
+		// TODO pub_msg.gpslongitude = 1;
+		// TODO pub_msg.micropumpencoder = depthsensor;
+		// TODO pub_msg.pitchencoder = 2;
+		// TODO pub_msg.rollencoder = 3;
 
 		// Publish the message
-		rcl_publish(&publisher, &pub_msg, NULL);
+		// rcl_publish(&publisher, &pub_msg, NULL);
+		// rcl_publish(&dist_publisher, &dist_msg, NULL);
 
 		// Reinitialize watchdog timer
 		// HAL_IWDG_Init(&hiwdg);
-	}
+	// }
 }
+
+// Using TIM2_CH1 for FG signal
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
+    if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
+        static uint32_t lastCapture = 0;
+        uint32_t now = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);
+        uint32_t period = (now >= lastCapture) ? (now - lastCapture) : (0xFFFF - lastCapture + now);
+        lastCapture = now;
+
+        float freq = (float)HAL_RCC_GetPCLK1Freq() / (htim->Init.Prescaler + 1) / period;
+        rpm = (60.0f * freq) / 9.0f;
+        rpm = 1;
+        // store rpm somewhere
+    }
+}
+
+float get_angle_deg(void) {
+    // coarse sector:
+    uint32_t sector = (pulse_count % 9);
+    float base = sector * 40.0f;
+    // fraction interpolation:
+    uint32_t now = HAL_GetTick();
+    uint32_t elapsed = (now >= last_ts) ? (now - last_ts) : (0xFFFFFFFF - last_ts + now);
+    float fraction = (last_period > 0) ? ((float)elapsed / (float)last_period) : 0.0f;
+    if (fraction > 1.0f) fraction = 1.0f;
+    return (int32_t) rpm;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -159,8 +254,6 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 	blinkCounter = 5;
-
-
 
   /* USER CODE END 1 */
 
@@ -185,8 +278,15 @@ int main(void)
   MX_DMA_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_TIM4_Init();
+  MX_ADC1_Init();
+  MX_CAN1_Init();
+  MX_USART2_UART_Init();
   MX_I2C1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 
   while (blinkCounter > 0)
   {
@@ -197,6 +297,13 @@ int main(void)
 	blinkCounter -= 1;
   }
 
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+  while(HAL_GPIO_ReadPin(Roll_Start_GPIO_Port, Roll_Start_Pin) == GPIO_PIN_SET) {
+
+  }
+  htim2.Instance->CCR3 = 4095;
+  HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -221,6 +328,15 @@ int main(void)
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of Actuate */
+  ActuateHandle = osThreadNew(StartActuate, NULL, &Actuate_attributes);
+
+  /* creation of tosDistTask */
+  tosDistTaskHandle = osThreadNew(StartDistTask, NULL, &tosDistTask_attributes);
+
+  /* creation of rollEncoderTask */
+  rollEncoderTaskHandle = osThreadNew(StartRollTask, NULL, &rollEncoderTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -293,6 +409,95 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief CAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CAN1_Init(void)
+{
+
+  /* USER CODE BEGIN CAN1_Init 0 */
+
+  /* USER CODE END CAN1_Init 0 */
+
+  /* USER CODE BEGIN CAN1_Init 1 */
+
+  /* USER CODE END CAN1_Init 1 */
+  hcan1.Instance = CAN1;
+  hcan1.Init.Prescaler = 16;
+  hcan1.Init.Mode = CAN_MODE_NORMAL;
+  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan1.Init.TimeSeg1 = CAN_BS1_1TQ;
+  hcan1.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan1.Init.TimeTriggeredMode = DISABLE;
+  hcan1.Init.AutoBusOff = DISABLE;
+  hcan1.Init.AutoWakeUp = DISABLE;
+  hcan1.Init.AutoRetransmission = DISABLE;
+  hcan1.Init.ReceiveFifoLocked = DISABLE;
+  hcan1.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CAN1_Init 2 */
+
+  /* USER CODE END CAN1_Init 2 */
+
+}
+
+/**
   * @brief I2C1 Initialization Function
   * @param None
   * @retval None
@@ -323,6 +528,170 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4095;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 9;
+  if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 2047;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 0;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65535;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 32765;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_RTS_CTS;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
 
 }
 
@@ -404,18 +773,12 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
   /* DMA1_Stream1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
   /* DMA1_Stream3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
-  /* DMA1_Stream6_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 
 }
 
@@ -433,23 +796,44 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOG_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13|Enable_24V_Pin|Pump_Dir_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOF, Pitch_En_3V3_Pin|Pitch_Dir_3V3_Pin|Roll_DIR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(Roll_Start_Output_GPIO_Port, Roll_Start_Output_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : USER_Btn_Pin */
-  GPIO_InitStruct.Pin = USER_Btn_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(CAN_Set_Zero_GPIO_Port, CAN_Set_Zero_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PC13 Enable_24V_Pin Pump_Dir_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_13|Enable_24V_Pin|Pump_Dir_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : Pitch_En_3V3_Pin Pitch_Dir_3V3_Pin Roll_DIR_Pin */
+  GPIO_InitStruct.Pin = Pitch_En_3V3_Pin|Pitch_Dir_3V3_Pin|Roll_DIR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD1_Pin LD3_Pin LD2_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|LD2_Pin;
@@ -458,18 +842,25 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : USB_PowerSwitchOn_Pin */
-  GPIO_InitStruct.Pin = USB_PowerSwitchOn_Pin;
+  /*Configure GPIO pins : Roll_Start_Pin USB_OverCurrent_Pin */
+  GPIO_InitStruct.Pin = Roll_Start_Pin|USB_OverCurrent_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : Roll_Start_Output_Pin USB_PowerSwitchOn_Pin */
+  GPIO_InitStruct.Pin = Roll_Start_Output_Pin|USB_PowerSwitchOn_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(USB_PowerSwitchOn_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : USB_OverCurrent_Pin */
-  GPIO_InitStruct.Pin = USB_OverCurrent_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pin : CAN_Set_Zero_Pin */
+  GPIO_InitStruct.Pin = CAN_Set_Zero_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(CAN_Set_Zero_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -512,7 +903,7 @@ void StartDefaultTask(void *argument)
 
   allocator = rcl_get_default_allocator();
 
-  pub_msg.data = 0;
+  // pub_msg.data = 0;
 
   //create init_options
   RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
@@ -526,6 +917,19 @@ void StartDefaultTask(void *argument)
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
     "cubemx_publisher"));
+
+  RCCHECK(rclc_publisher_init_default(
+	&dist_publisher,
+	&node,
+	ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt16),
+	"TOPIC_TOF_MM"));
+
+  RCCHECK(rclc_publisher_init_default(
+	&roll_publisher,
+	&node,
+	ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+	"TOPIC_ROLL_ENCODER"));
+
 
   // create subscriber
   RCCHECK(rclc_subscription_init_default(
@@ -548,8 +952,21 @@ void StartDefaultTask(void *argument)
       printf("Error publishing (line %d)\n", __LINE__);
     }
 
+    rcl_ret_t ret_dist = rcl_publish(&dist_publisher, &dist_msg, NULL);
+    if (ret_dist != RCL_RET_OK)
+    {
+      printf("Error publishing (line %d)\n", __LINE__);
+    }
+
+
+    rcl_ret_t ret_roll = rcl_publish(&roll_publisher, &roll_msg, NULL);
+	if (ret_roll != RCL_RET_OK)
+	{
+	  printf("Error publishing (line %d)\n", __LINE__);
+	}
+
     // counter
-    pub_msg.data++;
+    // TODO pub_msg.data++;
     osDelay(100);
 
     // spin executor to subscribe to topic
@@ -558,15 +975,114 @@ void StartDefaultTask(void *argument)
     // blink the counter by the data received from the topic
     while (blinkCounter > 0)
       {
-        HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
         HAL_Delay(100);
-        HAL_GPIO_WritePin(GPIOB, LD2_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
         HAL_Delay(100);
         blinkCounter -= 1;
       }
   }
 
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartActuate */
+/**
+* @brief Function implementing the Actuate thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartActuate */
+void StartActuate(void *argument)
+{
+  /* USER CODE BEGIN StartActuate */
+  HAL_GPIO_WritePin(Pitch_En_3V3_GPIO_Port, Pitch_En_3V3_Pin, GPIO_PIN_SET);
+
+  osDelay(250);
+
+  /* Infinite loop */
+  for(;;)
+  {
+	HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
+	osDelay(1000);
+    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
+    osDelay(5000);
+    HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_3);
+    osDelay(1000);
+    // HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+    HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+	osDelay(1000);
+	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
+	osDelay(5000);
+	HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_3);
+	osDelay(1000);
+  }
+  /* USER CODE END StartActuate */
+}
+
+/* USER CODE BEGIN Header_StartDistTask */
+/**
+* @brief Function implementing the tosDistTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartDistTask */
+void StartDistTask(void *argument)
+{
+  /* USER CODE BEGIN StartDistTask */
+
+	// Initialise the VL53L0X
+	statInfo_t_VL53L0X distanceStr;
+
+	  hi2c1.Instance = I2C1;
+	  hi2c1.Init.ClockSpeed = 100000;
+	  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+	  hi2c1.Init.OwnAddress1 = 0;
+	  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+	  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+	  hi2c1.Init.OwnAddress2 = 0;
+	  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+	  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+
+	initVL53L0X(1, &hi2c1);
+
+	// Configure the sensor for high accuracy and speed in 20 cm.
+	setSignalRateLimit(200);
+	setVcselPulsePeriod(VcselPeriodPreRange, 10);
+	setVcselPulsePeriod(VcselPeriodFinalRange, 14);
+	setMeasurementTimingBudget(300 * 1000UL);
+
+  /* Infinite loop */
+  for(;;)
+  {
+	// uint16_t distance is the distance in millimeters.
+	// statInfo_t_VL53L0X distanceStr is the statistics read from the sensor.
+	dist_msg.data = readRangeSingleMillimeters(&distanceStr);
+    osDelay(1);
+  }
+  /* USER CODE END StartDistTask */
+}
+
+/* USER CODE BEGIN Header_StartRollTask */
+/**
+* @brief Function implementing the rollEncoderTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRollTask */
+void StartRollTask(void *argument)
+{
+  /* USER CODE BEGIN StartRollTask */
+	HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+  /* Infinite loop */
+  for(;;)
+  {
+	roll_msg.data = get_angle_deg();
+    osDelay(1);
+  }
+  /* USER CODE END StartRollTask */
 }
 
 /**

@@ -49,6 +49,8 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -57,18 +59,34 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define USER_Btn_Pin GPIO_PIN_13
-#define USER_Btn_GPIO_Port GPIOC
+#define Pitch_En_3V3_Pin GPIO_PIN_0
+#define Pitch_En_3V3_GPIO_Port GPIOF
+#define Pitch_Dir_3V3_Pin GPIO_PIN_1
+#define Pitch_Dir_3V3_GPIO_Port GPIOF
+#define Roll_DIR_Pin GPIO_PIN_3
+#define Roll_DIR_GPIO_Port GPIOF
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
+#define Roll_Hull_Pin GPIO_PIN_5
+#define Roll_Hull_GPIO_Port GPIOA
+#define Enable_24V_Pin GPIO_PIN_5
+#define Enable_24V_GPIO_Port GPIOC
 #define LD1_Pin GPIO_PIN_0
 #define LD1_GPIO_Port GPIOB
+#define Roll_Start_Pin GPIO_PIN_0
+#define Roll_Start_GPIO_Port GPIOG
+#define Roll_Start_Output_Pin GPIO_PIN_1
+#define Roll_Start_Output_GPIO_Port GPIOG
+#define Roll_PWM_Pin GPIO_PIN_10
+#define Roll_PWM_GPIO_Port GPIOB
 #define LD3_Pin GPIO_PIN_14
 #define LD3_GPIO_Port GPIOB
-#define STLK_RX_Pin GPIO_PIN_8
-#define STLK_RX_GPIO_Port GPIOD
-#define STLK_TX_Pin GPIO_PIN_9
-#define STLK_TX_GPIO_Port GPIOD
+#define UART3_TX_Pin GPIO_PIN_8
+#define UART3_TX_GPIO_Port GPIOD
+#define UART3_RX_Pin GPIO_PIN_9
+#define UART3_RX_GPIO_Port GPIOD
+#define Pitch_Pul_3V3_Pin GPIO_PIN_14
+#define Pitch_Pul_3V3_GPIO_Port GPIOD
 #define USB_PowerSwitchOn_Pin GPIO_PIN_6
 #define USB_PowerSwitchOn_GPIO_Port GPIOG
 #define USB_OverCurrent_Pin GPIO_PIN_7
@@ -87,8 +105,16 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define Pump_Dir_Pin GPIO_PIN_12
+#define Pump_Dir_GPIO_Port GPIOC
+#define CAN_Set_Zero_Pin GPIO_PIN_2
+#define CAN_Set_Zero_GPIO_Port GPIOD
+#define TOF_SCL_Pin GPIO_PIN_6
+#define TOF_SCL_GPIO_Port GPIOB
 #define LD2_Pin GPIO_PIN_7
 #define LD2_GPIO_Port GPIOB
+#define TOF_SDA_Pin GPIO_PIN_9
+#define TOF_SDA_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
