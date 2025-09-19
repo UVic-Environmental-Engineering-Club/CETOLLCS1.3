@@ -37,10 +37,8 @@
 #include <std_msgs/msg/string.h>
 
 // UVEEC Custom Interface
-// #include <uveec_custom_interfaces/msg/raspberry_sensors_interface.h>
-// #include <uveec_custom_interfaces/msg/stm_sensors_interface.h>
-// #include <uveec_custom_interface/msg/detail/raspberry_sensors_interface.h>
-// #include <uveec_custom_interface/msg/detail/StmSensorsInterface.h>
+#include <uveec_custom_interfaces/msg/raspberry_sensors_interface.h>
+#include <uveec_custom_interfaces/msg/stm_sensors_interface.h>
 
 // RCL return Check
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
@@ -98,23 +96,38 @@ const osThreadAttr_t defaultTask_attributes = {
 };
 /* Definitions for Actuate */
 osThreadId_t ActuateHandle;
+uint32_t ActuateBuffer[ 128 ];
+osStaticThreadDef_t ActuateControlBlock;
 const osThreadAttr_t Actuate_attributes = {
   .name = "Actuate",
-  .stack_size = 128 * 4,
+  .cb_mem = &ActuateControlBlock,
+  .cb_size = sizeof(ActuateControlBlock),
+  .stack_mem = &ActuateBuffer[0],
+  .stack_size = sizeof(ActuateBuffer),
   .priority = (osPriority_t) osPriorityBelowNormal,
 };
 /* Definitions for tosDistTask */
 osThreadId_t tosDistTaskHandle;
+uint32_t tosDistTaskBuffer[ 128 ];
+osStaticThreadDef_t tosDistTaskControlBlock;
 const osThreadAttr_t tosDistTask_attributes = {
   .name = "tosDistTask",
-  .stack_size = 128 * 4,
+  .cb_mem = &tosDistTaskControlBlock,
+  .cb_size = sizeof(tosDistTaskControlBlock),
+  .stack_mem = &tosDistTaskBuffer[0],
+  .stack_size = sizeof(tosDistTaskBuffer),
   .priority = (osPriority_t) osPriorityBelowNormal,
 };
 /* Definitions for rollEncoderTask */
 osThreadId_t rollEncoderTaskHandle;
+uint32_t rollEncoderTaskBuffer[ 128 ];
+osStaticThreadDef_t rollEncoderTaskControlBlock;
 const osThreadAttr_t rollEncoderTask_attributes = {
   .name = "rollEncoderTask",
-  .stack_size = 128 * 4,
+  .cb_mem = &rollEncoderTaskControlBlock,
+  .cb_size = sizeof(rollEncoderTaskControlBlock),
+  .stack_mem = &rollEncoderTaskBuffer[0],
+  .stack_size = sizeof(rollEncoderTaskBuffer),
   .priority = (osPriority_t) osPriorityLow,
 };
 /* USER CODE BEGIN PV */
