@@ -138,17 +138,13 @@ rclc_executor_t executor;
 
 // publisher
 rcl_publisher_t publisher;
-std_msgs__msg__Int32 pub_msg;
-rcl_publisher_t dist_publisher;
-std_msgs__msg__UInt16 dist_msg;
-rcl_publisher_t roll_publisher;
-std_msgs__msg__Int32 roll_msg;
-// TODO uveec_custom_interface__msg__StmSensorsInterface pub_msg;
+
+uveec_custom_interfaces__msg__StmSensorsInterface pub_msg;
 rcl_timer_t timer;
 
 // subscriber
 rcl_subscription_t subscriber;
-std_msgs__msg__Int32 sub_msg;
+uveec_custom_interfaces__msg__RaspberrySensorsInterface sub_msg;
 
 const unsigned int timer_period = RCL_MS_TO_NS(10);
 const int timeout_ms = 1000;
@@ -193,12 +189,12 @@ void subscription_callback(const void * msgin)
 {
   // Cast received message to used type
   // const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
-  // TODO const uveec_custom_interface__msg__RaspberrySensorsInterface * raspmsg = (const uveec_custom_interface__msg__RaspberrySensorsInterface *) msgin;
+  const uveec_custom_interfaces__msg__RaspberrySensorsInterface * raspmsg = (const uveec_custom_interfaces__msg__RaspberrySensorsInterface *) msgin;
 
   // Process message
   // blinkCounter = msg->data;
-  blinkCounter = 3;
-  // TODO blinkConuter = raspmsg->depthsensor;
+  blinkCounter = (int) raspmsg->depthsensor;
+  pub_msg.gpslatitude = (int) raspmsg->depthsensor;
 }
 
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
@@ -928,32 +924,22 @@ void StartDefaultTask(void *argument)
   RCCHECK(rclc_publisher_init_default(
     &publisher,
     &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-    "cubemx_publisher"));
-
-  RCCHECK(rclc_publisher_init_default(
-	&dist_publisher,
-	&node,
-	ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt16),
-	"TOPIC_TOF_MM"));
-
-  RCCHECK(rclc_publisher_init_default(
-	&roll_publisher,
-	&node,
-	ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-	"TOPIC_ROLL_ENCODER"));
+    ROSIDL_GET_MSG_TYPE_SUPPORT(uveec_custom_interfaces, msg, StmSensorsInterface),
+    "stm_sensors_topic"));
 
 
   // create subscriber
   RCCHECK(rclc_subscription_init_default(
     &subscriber,
     &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-    "raspberry_publisher"));
+    ROSIDL_GET_MSG_TYPE_SUPPORT(uveec_custom_interfaces, msg, RaspberrySensorsInterface),
+    "raspberry_sensors_topic"));
 
   // create executor (subscribing)
   RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &sub_msg, &subscription_callback, ON_NEW_DATA));
+
+  pub_msg.gpslatitude = blinkCounter;
 
   // infintie loop. Might need to change this to use executors
   for(;;)
@@ -965,22 +951,9 @@ void StartDefaultTask(void *argument)
       printf("Error publishing (line %d)\n", __LINE__);
     }
 
-    rcl_ret_t ret_dist = rcl_publish(&dist_publisher, &dist_msg, NULL);
-    if (ret_dist != RCL_RET_OK)
-    {
-      printf("Error publishing (line %d)\n", __LINE__);
-    }
-
-
-    rcl_ret_t ret_roll = rcl_publish(&roll_publisher, &roll_msg, NULL);
-	if (ret_roll != RCL_RET_OK)
-	{
-	  printf("Error publishing (line %d)\n", __LINE__);
-	}
-
     // counter
     // TODO pub_msg.data++;
-    osDelay(100);
+    osDelay(1000);
 
     // spin executor to subscribe to topic
     RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
@@ -989,9 +962,9 @@ void StartDefaultTask(void *argument)
     while (blinkCounter > 0)
       {
         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-        HAL_Delay(100);
+        HAL_Delay(200);
         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-        HAL_Delay(100);
+        HAL_Delay(200);
         blinkCounter -= 1;
       }
   }
@@ -1072,7 +1045,7 @@ void StartDistTask(void *argument)
   {
 	// uint16_t distance is the distance in millimeters.
 	// statInfo_t_VL53L0X distanceStr is the statistics read from the sensor.
-	dist_msg.data = readRangeSingleMillimeters(&distanceStr);
+	// pub_msg.pitchencoder.data = readRangeSingleMillimeters(&distanceStr);
     osDelay(1);
   }
   /* USER CODE END StartDistTask */
@@ -1092,7 +1065,6 @@ void StartRollTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	roll_msg.data = get_angle_deg();
     osDelay(1);
   }
   /* USER CODE END StartRollTask */
