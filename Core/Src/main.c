@@ -104,19 +104,19 @@ const osThreadAttr_t Actuate_attributes = {
   .cb_size = sizeof(ActuateControlBlock),
   .stack_mem = &ActuateBuffer[0],
   .stack_size = sizeof(ActuateBuffer),
-  .priority = (osPriority_t) osPriorityBelowNormal,
+  .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for tosDistTask */
-osThreadId_t tosDistTaskHandle;
+/* Definitions for tofDistTask */
+osThreadId_t tofDistTaskHandle;
 uint32_t tosDistTaskBuffer[ 128 ];
 osStaticThreadDef_t tosDistTaskControlBlock;
-const osThreadAttr_t tosDistTask_attributes = {
-  .name = "tosDistTask",
+const osThreadAttr_t tofDistTask_attributes = {
+  .name = "tofDistTask",
   .cb_mem = &tosDistTaskControlBlock,
   .cb_size = sizeof(tosDistTaskControlBlock),
   .stack_mem = &tosDistTaskBuffer[0],
   .stack_size = sizeof(tosDistTaskBuffer),
-  .priority = (osPriority_t) osPriorityBelowNormal,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for rollEncoderTask */
 osThreadId_t rollEncoderTaskHandle;
@@ -128,7 +128,7 @@ const osThreadAttr_t rollEncoderTask_attributes = {
   .cb_size = sizeof(rollEncoderTaskControlBlock),
   .stack_mem = &rollEncoderTaskBuffer[0],
   .stack_size = sizeof(rollEncoderTaskBuffer),
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
 rcl_node_t node;
@@ -157,6 +157,8 @@ volatile uint32_t last_ts = 0;
 volatile uint32_t last_period = 0;
 volatile uint32_t pulse_count = 0;
 volatile float rpm = 0;
+
+uint16_t distance;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -341,8 +343,8 @@ int main(void)
   /* creation of Actuate */
   ActuateHandle = osThreadNew(StartActuate, NULL, &Actuate_attributes);
 
-  /* creation of tosDistTask */
-  tosDistTaskHandle = osThreadNew(StartDistTask, NULL, &tosDistTask_attributes);
+  /* creation of tofDistTask */
+  tofDistTaskHandle = osThreadNew(StartDistTask, NULL, &tofDistTask_attributes);
 
   /* creation of rollEncoderTask */
   rollEncoderTaskHandle = osThreadNew(StartRollTask, NULL, &rollEncoderTask_attributes);
@@ -953,7 +955,7 @@ void StartDefaultTask(void *argument)
 
     // counter
     // TODO pub_msg.data++;
-    osDelay(1000);
+    osDelay(200);
 
     // spin executor to subscribe to topic
     RCCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
@@ -1045,8 +1047,9 @@ void StartDistTask(void *argument)
   {
 	// uint16_t distance is the distance in millimeters.
 	// statInfo_t_VL53L0X distanceStr is the statistics read from the sensor.
-	// pub_msg.pitchencoder.data = readRangeSingleMillimeters(&distanceStr);
-    osDelay(1);
+	pub_msg.pitchencoder = readRangeSingleMillimeters(&distanceStr);
+
+	osDelay(1);
   }
   /* USER CODE END StartDistTask */
 }
