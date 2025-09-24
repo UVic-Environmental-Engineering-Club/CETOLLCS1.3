@@ -62,7 +62,7 @@ extern DMA_HandleTypeDef hdma_usart3_tx;
 /* USER CODE END 0 */
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-                                        /**
+                                                                                                                        /**
   * Initializes the Global MSP.
   */
 void HAL_MspInit(void)
@@ -113,7 +113,34 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* hadc)
     /* USER CODE BEGIN ADC1_MspInit 1 */
 
     /* USER CODE END ADC1_MspInit 1 */
+  }
+  else if(hadc->Instance==ADC2)
+  {
+    /* USER CODE BEGIN ADC2_MspInit 0 */
 
+    /* USER CODE END ADC2_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_ADC2_CLK_ENABLE();
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    /**ADC2 GPIO Configuration
+    PA4     ------> ADC2_IN4
+    PB1     ------> ADC2_IN9
+    */
+    GPIO_InitStruct.Pin = ADC_24V_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(ADC_24V_GPIO_Port, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = ADC_11V_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(ADC_11V_GPIO_Port, &GPIO_InitStruct);
+
+    /* USER CODE BEGIN ADC2_MspInit 1 */
+
+    /* USER CODE END ADC2_MspInit 1 */
   }
 
 }
@@ -142,6 +169,26 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc)
     /* USER CODE BEGIN ADC1_MspDeInit 1 */
 
     /* USER CODE END ADC1_MspDeInit 1 */
+  }
+  else if(hadc->Instance==ADC2)
+  {
+    /* USER CODE BEGIN ADC2_MspDeInit 0 */
+
+    /* USER CODE END ADC2_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_ADC2_CLK_DISABLE();
+
+    /**ADC2 GPIO Configuration
+    PA4     ------> ADC2_IN4
+    PB1     ------> ADC2_IN9
+    */
+    HAL_GPIO_DeInit(ADC_24V_GPIO_Port, ADC_24V_Pin);
+
+    HAL_GPIO_DeInit(ADC_11V_GPIO_Port, ADC_11V_Pin);
+
+    /* USER CODE BEGIN ADC2_MspDeInit 1 */
+
+    /* USER CODE END ADC2_MspDeInit 1 */
   }
 
 }
@@ -297,16 +344,16 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
     /* Peripheral clock enable */
     __HAL_RCC_TIM2_CLK_ENABLE();
 
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
     /**TIM2 GPIO Configuration
-    PA5     ------> TIM2_CH1
+    PB3     ------> TIM2_CH2
     */
-    GPIO_InitStruct.Pin = Roll_Hull_Pin;
+    GPIO_InitStruct.Pin = Roll_Hall_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
-    HAL_GPIO_Init(Roll_Hull_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(Roll_Hall_GPIO_Port, &GPIO_InitStruct);
 
     /* TIM2 interrupt Init */
     HAL_NVIC_SetPriority(TIM2_IRQn, 5, 0);
@@ -325,6 +372,53 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
     /* USER CODE BEGIN TIM4_MspInit 1 */
 
     /* USER CODE END TIM4_MspInit 1 */
+  }
+  else if(htim_base->Instance==TIM10)
+  {
+    /* USER CODE BEGIN TIM10_MspInit 0 */
+
+    /* USER CODE END TIM10_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM10_CLK_ENABLE();
+    /* TIM10 interrupt Init */
+    HAL_NVIC_SetPriority(TIM1_UP_TIM10_IRQn, 15, 0);
+    HAL_NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn);
+    /* USER CODE BEGIN TIM10_MspInit 1 */
+
+    /* USER CODE END TIM10_MspInit 1 */
+  }
+  else if(htim_base->Instance==TIM11)
+  {
+    /* USER CODE BEGIN TIM11_MspInit 0 */
+
+    /* USER CODE END TIM11_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM11_CLK_ENABLE();
+    /* USER CODE BEGIN TIM11_MspInit 1 */
+
+    /* USER CODE END TIM11_MspInit 1 */
+  }
+  else if(htim_base->Instance==TIM13)
+  {
+    /* USER CODE BEGIN TIM13_MspInit 0 */
+
+    /* USER CODE END TIM13_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM13_CLK_ENABLE();
+    /* USER CODE BEGIN TIM13_MspInit 1 */
+
+    /* USER CODE END TIM13_MspInit 1 */
+  }
+  else if(htim_base->Instance==TIM14)
+  {
+    /* USER CODE BEGIN TIM14_MspInit 0 */
+
+    /* USER CODE END TIM14_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM14_CLK_ENABLE();
+    /* USER CODE BEGIN TIM14_MspInit 1 */
+
+    /* USER CODE END TIM14_MspInit 1 */
   }
 
 }
@@ -361,17 +455,102 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
     __HAL_RCC_GPIOD_CLK_ENABLE();
     /**TIM4 GPIO Configuration
     PD14     ------> TIM4_CH3
+    PD15     ------> TIM4_CH4
     */
-    GPIO_InitStruct.Pin = Pitch_Pul_3V3_Pin;
+    GPIO_InitStruct.Pin = Pump_Pul_3V3_Pin|Pitch_Pul_3V3_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF2_TIM4;
-    HAL_GPIO_Init(Pitch_Pul_3V3_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
     /* USER CODE BEGIN TIM4_MspPostInit 1 */
 
     /* USER CODE END TIM4_MspPostInit 1 */
+  }
+  else if(htim->Instance==TIM10)
+  {
+    /* USER CODE BEGIN TIM10_MspPostInit 0 */
+
+    /* USER CODE END TIM10_MspPostInit 0 */
+
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    /**TIM10 GPIO Configuration
+    PF6     ------> TIM10_CH1
+    */
+    GPIO_InitStruct.Pin = Green_OB_LED1_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF3_TIM10;
+    HAL_GPIO_Init(Green_OB_LED1_GPIO_Port, &GPIO_InitStruct);
+
+    /* USER CODE BEGIN TIM10_MspPostInit 1 */
+
+    /* USER CODE END TIM10_MspPostInit 1 */
+  }
+  else if(htim->Instance==TIM11)
+  {
+    /* USER CODE BEGIN TIM11_MspPostInit 0 */
+
+    /* USER CODE END TIM11_MspPostInit 0 */
+
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    /**TIM11 GPIO Configuration
+    PF7     ------> TIM11_CH1
+    */
+    GPIO_InitStruct.Pin = Green_OB_LED2_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF3_TIM11;
+    HAL_GPIO_Init(Green_OB_LED2_GPIO_Port, &GPIO_InitStruct);
+
+    /* USER CODE BEGIN TIM11_MspPostInit 1 */
+
+    /* USER CODE END TIM11_MspPostInit 1 */
+  }
+  else if(htim->Instance==TIM13)
+  {
+    /* USER CODE BEGIN TIM13_MspPostInit 0 */
+
+    /* USER CODE END TIM13_MspPostInit 0 */
+
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    /**TIM13 GPIO Configuration
+    PF8     ------> TIM13_CH1
+    */
+    GPIO_InitStruct.Pin = Red_OB_LED1_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF9_TIM13;
+    HAL_GPIO_Init(Red_OB_LED1_GPIO_Port, &GPIO_InitStruct);
+
+    /* USER CODE BEGIN TIM13_MspPostInit 1 */
+
+    /* USER CODE END TIM13_MspPostInit 1 */
+  }
+  else if(htim->Instance==TIM14)
+  {
+    /* USER CODE BEGIN TIM14_MspPostInit 0 */
+
+    /* USER CODE END TIM14_MspPostInit 0 */
+
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    /**TIM14 GPIO Configuration
+    PF9     ------> TIM14_CH1
+    */
+    GPIO_InitStruct.Pin = Red_OB_LED2_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF9_TIM14;
+    HAL_GPIO_Init(Red_OB_LED2_GPIO_Port, &GPIO_InitStruct);
+
+    /* USER CODE BEGIN TIM14_MspPostInit 1 */
+
+    /* USER CODE END TIM14_MspPostInit 1 */
   }
 
 }
@@ -392,12 +571,10 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
     __HAL_RCC_TIM2_CLK_DISABLE();
 
     /**TIM2 GPIO Configuration
-    PA5     ------> TIM2_CH1
     PB10     ------> TIM2_CH3
+    PB3     ------> TIM2_CH2
     */
-    HAL_GPIO_DeInit(Roll_Hull_GPIO_Port, Roll_Hull_Pin);
-
-    HAL_GPIO_DeInit(Roll_PWM_GPIO_Port, Roll_PWM_Pin);
+    HAL_GPIO_DeInit(GPIOB, Roll_PWM_Pin|Roll_Hall_Pin);
 
     /* TIM2 interrupt DeInit */
     HAL_NVIC_DisableIRQ(TIM2_IRQn);
@@ -415,6 +592,53 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
     /* USER CODE BEGIN TIM4_MspDeInit 1 */
 
     /* USER CODE END TIM4_MspDeInit 1 */
+  }
+  else if(htim_base->Instance==TIM10)
+  {
+    /* USER CODE BEGIN TIM10_MspDeInit 0 */
+
+    /* USER CODE END TIM10_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM10_CLK_DISABLE();
+
+    /* TIM10 interrupt DeInit */
+    HAL_NVIC_DisableIRQ(TIM1_UP_TIM10_IRQn);
+    /* USER CODE BEGIN TIM10_MspDeInit 1 */
+
+    /* USER CODE END TIM10_MspDeInit 1 */
+  }
+  else if(htim_base->Instance==TIM11)
+  {
+    /* USER CODE BEGIN TIM11_MspDeInit 0 */
+
+    /* USER CODE END TIM11_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM11_CLK_DISABLE();
+    /* USER CODE BEGIN TIM11_MspDeInit 1 */
+
+    /* USER CODE END TIM11_MspDeInit 1 */
+  }
+  else if(htim_base->Instance==TIM13)
+  {
+    /* USER CODE BEGIN TIM13_MspDeInit 0 */
+
+    /* USER CODE END TIM13_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM13_CLK_DISABLE();
+    /* USER CODE BEGIN TIM13_MspDeInit 1 */
+
+    /* USER CODE END TIM13_MspDeInit 1 */
+  }
+  else if(htim_base->Instance==TIM14)
+  {
+    /* USER CODE BEGIN TIM14_MspDeInit 0 */
+
+    /* USER CODE END TIM14_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM14_CLK_DISABLE();
+    /* USER CODE BEGIN TIM14_MspDeInit 1 */
+
+    /* USER CODE END TIM14_MspDeInit 1 */
   }
 
 }
@@ -615,11 +839,10 @@ void HAL_PCD_MspInit(PCD_HandleTypeDef* hpcd)
     /**USB_OTG_FS GPIO Configuration
     PA8     ------> USB_OTG_FS_SOF
     PA9     ------> USB_OTG_FS_VBUS
-    PA10     ------> USB_OTG_FS_ID
     PA11     ------> USB_OTG_FS_DM
     PA12     ------> USB_OTG_FS_DP
     */
-    GPIO_InitStruct.Pin = USB_SOF_Pin|USB_ID_Pin|USB_DM_Pin|USB_DP_Pin;
+    GPIO_InitStruct.Pin = USB_SOF_Pin|USB_DM_Pin|USB_DP_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -660,12 +883,10 @@ void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
     /**USB_OTG_FS GPIO Configuration
     PA8     ------> USB_OTG_FS_SOF
     PA9     ------> USB_OTG_FS_VBUS
-    PA10     ------> USB_OTG_FS_ID
     PA11     ------> USB_OTG_FS_DM
     PA12     ------> USB_OTG_FS_DP
     */
-    HAL_GPIO_DeInit(GPIOA, USB_SOF_Pin|USB_VBUS_Pin|USB_ID_Pin|USB_DM_Pin
-                          |USB_DP_Pin);
+    HAL_GPIO_DeInit(GPIOA, USB_SOF_Pin|USB_VBUS_Pin|USB_DM_Pin|USB_DP_Pin);
 
     /* USER CODE BEGIN USB_OTG_FS_MspDeInit 1 */
 
