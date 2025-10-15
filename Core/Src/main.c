@@ -153,6 +153,8 @@ uveec_custom_interfaces__msg__RaspberrySensorsInterface sub_msg;
 
 const unsigned int timer_period = RCL_MS_TO_NS(10);
 const int timeout_ms = 1000;
+const float min_tof_distance = 40.7;
+const float max_tof_distance = 161.6;
 
 int32_t blinkCounter = 5;
 float depthsensor = 0;
@@ -164,6 +166,7 @@ volatile uint32_t pulse_count = 0;
 volatile float rpm = 0;
 
 uint16_t distance;
+int pitch_direction = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -264,6 +267,29 @@ float get_angle_deg(void) {
     return (int32_t) rpm;
 }
 
+int change_pitch_direction(int dir) {
+	if (pitch_direction == 0 && dir == 1) { // pitch motor is getting closer to tof
+		HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_4);
+		HAL_Delay(100);
+		HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
+		HAL_Delay(100);
+		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+		pitch_direction = 1;
+		return 1;
+	} else if (pitch_direction == 1 && dir == 0) { // pitch motor is getting further from tof
+		HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_4);
+		HAL_Delay(100);
+		HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+		HAL_Delay(100);
+		HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
+		pitch_direction = 0;
+		return 0;
+	}
+	return -1;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -324,7 +350,7 @@ int main(void)
   }
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-  while(HAL_GPIO_ReadPin(Roll_Start_GPIO_Port, Roll_Start_Pin) == GPIO_PIN_SET) {
+  while(HAL_GPIO_ReadPin(Roll_Hall_GPIO_Port, Roll_Hall_Pin) == GPIO_PIN_SET) {
 
   }
   htim2.Instance->CCR3 = 4095;
@@ -1070,11 +1096,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, Pump_En_Pin|Brake_En_Pin|Enable_24V_Pin|Enable_11V_Pin
-                          |Pump_Dir_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, Pitch_En_3V3_Pin|Pitch_Dir_3V3_Pin|Roll_DIR_Pin|En_24V_ADC_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOF, Pitch_En_3V3_Pin|Pitch_Dir_3V3_Pin|Roll_DIR_Pin|En_24V_ADC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, Brake_En_Pin|Enable_24V_Pin|Enable_11V_Pin|Pump_Dir_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
@@ -1085,14 +1110,11 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CAN_Set_Zero_GPIO_Port, CAN_Set_Zero_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : Pump_En_Pin Brake_En_Pin Enable_24V_Pin Enable_11V_Pin
-                           Pump_Dir_Pin */
-  GPIO_InitStruct.Pin = Pump_En_Pin|Brake_En_Pin|Enable_24V_Pin|Enable_11V_Pin
-                          |Pump_Dir_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  /*Configure GPIO pin : Usr_Btn_Pin */
+  GPIO_InitStruct.Pin = Usr_Btn_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(Usr_Btn_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Pitch_En_3V3_Pin Pitch_Dir_3V3_Pin Roll_DIR_Pin En_24V_ADC_Pin */
   GPIO_InitStruct.Pin = Pitch_En_3V3_Pin|Pitch_Dir_3V3_Pin|Roll_DIR_Pin|En_24V_ADC_Pin;
@@ -1100,6 +1122,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : Brake_En_Pin Enable_24V_Pin Enable_11V_Pin Pump_Dir_Pin */
+  GPIO_InitStruct.Pin = Brake_En_Pin|Enable_24V_Pin|Enable_11V_Pin|Pump_Dir_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD1_Pin LD3_Pin LD2_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|LD2_Pin;
@@ -1241,26 +1270,42 @@ void StartActuate(void *argument)
   /* USER CODE BEGIN StartActuate */
   HAL_GPIO_WritePin(Pitch_En_3V3_GPIO_Port, Pitch_En_3V3_Pin, GPIO_PIN_SET);
 
+  if (distance < min_tof_distance) {
+		pitch_direction = 1;
+		HAL_Delay(100);
+		HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
+		HAL_Delay(100);
+  }
+  else {
+		pitch_direction = 0;
+		HAL_Delay(100);
+		HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+		HAL_Delay(100);
+  }
+
   osDelay(250);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
 
   /* Infinite loop */
   for(;;)
   {
-	HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
-	osDelay(1000);
-    HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
-    osDelay(5000);
-    HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_4);
-    osDelay(1000);
-    // HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-    HAL_GPIO_WritePin(Pitch_Dir_3V3_GPIO_Port, Pitch_Dir_3V3_Pin, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-	osDelay(1000);
-	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
-	osDelay(5000);
-	HAL_TIM_PWM_Stop(&htim4, TIM_CHANNEL_4);
-	osDelay(1000);
+	  if (distance < min_tof_distance) {
+		  change_pitch_direction(0);
+	  }
+	  else if (distance > max_tof_distance) {
+		  change_pitch_direction(1);
+	  }
+	  if (HAL_GPIO_ReadPin(Usr_Btn_GPIO_Port, Usr_Btn_Pin) == GPIO_PIN_RESET) {
+		  // Button is pressed
+		  if (pitch_direction == 1) {
+		  		  change_pitch_direction(0);
+		  	  }
+		  	  else if (pitch_direction == 0) {
+		  		  change_pitch_direction(1);
+		  	  }
+	  }
   }
   /* USER CODE END StartActuate */
 }
@@ -1302,7 +1347,8 @@ void StartDistTask(void *argument)
   {
 	// uint16_t distance is the distance in millimeters.
 	// statInfo_t_VL53L0X distanceStr is the statistics read from the sensor.
-	pub_msg.pitchencoder = readRangeSingleMillimeters(&distanceStr);
+	distance = readRangeSingleMillimeters(&distanceStr);
+	pub_msg.pitchencoder = distance;
 
 	osDelay(1);
   }
